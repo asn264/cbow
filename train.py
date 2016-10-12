@@ -6,10 +6,12 @@ Takes training data and trains a CBOW model
 '''
 import os
 import sys
-import datetime
+import time
 import utils
+import datetime
 from cbow import *
 import tensorflow as tf
+import numpy as np
 
 #Set model parameters here
 EMBEDDING_DIM = 128
@@ -68,29 +70,25 @@ with tf.Graph().as_default():
 		#Initialize all variables
 		sess.run(tf.initialize_all_variables())
 
+		train_accuracy = None
+		train_loss = None
 		def train_step(x_batch, y_batch):
 
 			feed_dict = {
 				cbow.input_x: x_batch,
 				cbow.input_y: y_batch
 			}
-			step,loss,accuracy = sess.run(
-				[global_step, cbow.loss, cbow.accuracy],
+			_, train_step,train_loss,train_accuracy = sess.run(
+				[train_op, global_step, cbow.loss, cbow.accuracy],
 				feed_dict)
-			time_str = datetime.datetime.now().isoformat()
-			print "Train - {}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy)
-			return loss, accuracy
+			print "Training: step {}, loss {:g}, acc {:g}".format(train_step, train_loss, train_accuracy)
 
         #Generate batches
-        x_batches, y_batches = utils.get_batches(train_data, train_labels, batch_size, num_epochs)
-
-        #Training loop
-        train_acc = None
-        train_loss = None
-        for i in range(len(x_batches)):
-        	x_batch = x_batches[i]
-        	y_batch = y_batches[i]
-        	train_acc, train_loss = train_step(x_batch, y_batch)
+        batch_iter = utils.batch_iterator(train_data, train_labels, batch_size=BATCH_SIZE, num_epochs=NUM_EPOCHS)
+        for i in batch_iter:
+        	x_batch = i[0]
+        	y_batch = i[1]
+        	train_step(x_batch, y_batch)
         	current_step = tf.train.global_step(sess, global_step)
 
         #Report dev accuracy
@@ -98,20 +96,29 @@ with tf.Graph().as_default():
         	cbow.input_x: dev_data,
         	cbow.input_y: dev_labels
         }
-        dev_step, dev_loss, dev_acc = sess.run(
-        	[global_step, cbow.loss, cbow.accuracy]
-        	)
-        print "Dev: step {}, loss {:g}, acc {:g}".format(dev_step, dev_loss, dev_acc)
+        dev_step, dev_loss, dev_accuracy = sess.run(
+        	[global_step, cbow.loss, cbow.accuracy],
+        	dev_feed_dict)
+        print "Dev: step {}, loss {:g}, acc {:g}".format(dev_step, dev_loss, dev_accuracy)
 
         #Save model in directory with name = current UTC timestamp
-        save_directory = time.time()
-        outdir = os.getcwd()+save_directory+'/'
-        saver = tf.train.Saver(tf.all_variables())
-        if not os.path.exists(outdir):
-        	write_summary(outdir+'params.txt', train_acc, train_loss, dev_acc, dev_loss)
-        	path = saver.save(sess, save_directory, global_step=global_step)
-        	print 'Saved model and summary to ' + path
-        else:
-        	#this will never happen... 
-        	print 'Unable to save model'
+        save_directory_name = str(time.time())
+        outdir = os.getcwd()+save_directory_name+'/'
 
+        #Check if the directory already exists
+        if not os.path.exists(outdir):
+
+        	#Make the directory
+        	os.makedirs(outdir)
+        	
+        	#Write summary to text file with params, accs and losses
+        	write_summary(outdir+'params.txt', train_accuracy, train_loss, dev_accuracy, dev_loss)
+
+        	#tf Saver
+        	saver = tf.train.Saver(tf.all_variables())
+        	path = saver.save(sess, save_directory_name, global_step=global_step)
+        	print 'Saved model and summary to ' + path
+
+        #this will never happen... 
+        else:
+        	print 'Unable to save model'

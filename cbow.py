@@ -8,7 +8,7 @@ import sys
 
 class CBOW(object):
 
-	def __init__(self, vocab_size=10**4, embedding_dim=128, num_classes=2, batch_size=1):
+	def __init__(self, vocab_size=10**4, embedding_dim=128, num_classes=2):
 
 		#shape is [None,None] - meaning we can feed in any number of samples and each sample can have arbitrary length
 		self.input_x = tf.placeholder(tf.int32, shape=[None, None], name='input_x')
