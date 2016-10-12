@@ -44,7 +44,7 @@ with tf.Graph().as_default():
 		#Initialize all variables
 		sess.run(tf.initialize_all_variables())
 
-		def train_step(x_batch, y_batch):
+		def debug_step(x_batch, y_batch):
 
 			feed_dict = {
 				cbow.input_x: x_batch,
@@ -63,10 +63,9 @@ with tf.Graph().as_default():
 			print 'Loss: ', loss
 			print 'Accuracy: ', accuracy
 
-		#Generate batches
-		#x_batches, y_batches = utils.get_batches(train_data, train_labels, BATCH_SIZE, NUM_EPOCHS)
-
-		#Training loop
-		train_step(np.reshape(train_data[0],(BATCH_SIZE, len(train_data[0]))), np.reshape(train_labels[0],(BATCH_SIZE, len(train_labels[0]))))
-
+		batch_iter = utils.batch_iterator(train_data, train_labels, batch_size=3, num_epochs=1)
+		for i in batch_iter:
+			x_batch = i[0]
+			y_batch = i[1]
+			debug_step(x_batch, y_batch)
 

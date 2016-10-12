@@ -14,37 +14,44 @@ PATH_TO_TEST = '/Users/aditinair/Desktop/NLU_DL/assignment2/data/aclImdb/train/'
 
 def get_data(train=False, test=False):
 
+	if train:
+		path = PATH_TO_TRAIN
+	elif train:
+		path = PATH_TO_TEST
+	else:
+		print 'Specify train or test for get_data function'
+		sys.exit()
+
 	data = []
 	labels = []
 
-	if train:
-		for f in os.listdir(PATH_TO_TRAIN+'pos/'):
+	for f in os.listdir(path+'pos/'):
 
-			#ignore hidden files
-			if not f.startswith('.'):
+		#ignore hidden files
+		if not f.startswith('.'):
 
-				with open(PATH_TO_TRAIN+'pos/'+f) as review:
+			with open(path+'pos/'+f) as review:
 
-					data.append(review.read())
+				data.append(review.read())
 
-					#this is a probability distribution over class membership
-					labels.append([1,0])
+				#this is a probability distribution over class membership
+				labels.append([1,0])
 
-	if test:
-		for f in os.listdir(PATH_TO_TEST+'neg/'):
+	'''
+	for f in os.listdir(path+'neg/'):
 
-			#ignore hidden files
-			if not f.startswith('.'):
+		#ignore hidden files
+		if not f.startswith('.'):
 
-				with open(PATH_TOT_TEST+'neg/'+f) as review:
+			with open(path+'neg/'+f) as review:
 
-					data.append(review.read())
+				data.append(review.read())
 
-					#this is a probability distribution over class membership
-					labels.append([0,1])
-
+				#this is a probability distribution over class membership
+				labels.append([0,1])
+	'''
 	#list of strings, list of ints
-	return data, labels
+	return np.asarray(data), np.asarray(labels)
 
 
 def clean_str(string):
@@ -83,11 +90,11 @@ def get_dataset(data, vocab_size=10000, max_sentence_length=50):
 	#Get the top 10k-1 words in the corpus. Last word is UNK. Replace weird break symbols with newline chars.
 	corpus = ' '.join(clean_str(review) for review in data).split()
 	counts = Counter(corpus).most_common(vocab_size-1)
-	vocabulary = {token[0]:idx for idx,token in enumerate(counts)}
+	vocabulary = {token[0]:(idx+1) for idx,token in enumerate(counts)}
 
-	#Add UNK to vocab, with idx = last element in dictionary list
-	unk_idx = len(vocabulary)
-	vocabulary['UNK'] = unk_idx
+	#Add PADDING_TOKEN to vocab, with idx = last element in dictionary list
+	padding_idx = 0
+	vocabulary['PADDING_TOKEN'] = padding_idx
 
 	#Clean up
 	del corpus
@@ -97,8 +104,8 @@ def get_dataset(data, vocab_size=10000, max_sentence_length=50):
 	bow_data = []
 	for review in data:
 		
-		#Tokenize reviews and limit max sentence length to 50
-		truncated_bow = review.strip().split()[:max_sentence_length]
+		#Tokenize reviews
+		truncated_bow = review.strip().split()
 
 		#Convert tokens to corresponding vocab idx, if possible
 		bow_by_idx = []
@@ -106,10 +113,19 @@ def get_dataset(data, vocab_size=10000, max_sentence_length=50):
 			try:
 				bow_by_idx.append(vocabulary[token])
 			except KeyError:
-				bow_by_idx.append(unk_idx)
-		bow_data.append(bow_by_idx)
+				#Don't include unknowns bc Zipfian distribution
+				pass
+			#Grab at most fifty known words form the sentence
+			if len(bow_by_idx) == max_sentence_length:
+				break
 
-	return bow_data, vocabulary
+		#padding if needed
+		diff = max_sentence_length - len(bow_by_idx)
+		if diff > 0:
+			bow_by_idx += [padding_idx]*diff
+		bow_data.append(np.asarray(bow_by_idx))
+
+	return np.asarray(bow_data), vocabulary
 
 
 def shuffled_train_dev_split(data, labels, train_frac=0.8):
@@ -124,7 +140,7 @@ def shuffled_train_dev_split(data, labels, train_frac=0.8):
 	return shuffled_data[:train_split], shuffled_labels[:train_split], shuffled_data[train_split:], shuffled_labels[train_split:]
 
 
-def batch_iterator(data, labels, batch_size, num_epochs):
+def batch_iterator(data, labels, batch_size, num_epochs=1):
 
 	data = np.asarray(data)
 	labels = np.asarray(labels)
@@ -132,30 +148,37 @@ def batch_iterator(data, labels, batch_size, num_epochs):
 	data_size = len(data)
 	num_partitions = data_size/int(batch_size)
 
-	batch_data = []
-	batch_labels = []
-
 	for j in range(num_epochs):
 
 		c_idx = 0
 		for i in range(num_partitions):
 			
-			yield data[c_idx:c_idx+batch_size], labels[c_idx:c_idx+batch_size]
+			yield np.asarray(data[c_idx:c_idx+batch_size]), np.asarray(labels[c_idx:c_idx+batch_size])
 			c_idx += batch_size
 		
 		if num_partitions*batch_size != data_size:
-
-			yield data[c_idx:], labels[c_idx:]
+			
+			yield np.asarray(data[c_idx:]), np.asarray(labels[c_idx:])
 
 
 def main():
 
+	'''
 	data, labels = get_data(train=True)
 	bow_data, vocabulary = get_dataset(data)
 	train_data, train_labels, dev_data, dev_labels = shuffled_train_dev_split(bow_data, labels)
-	print len(train_labels)
-	print len(dev_labels)
-	print len(labels)
+	batch_iter = batch_iterator(train_data, train_labels, batch_size=64, num_epochs=1)
+	for i in batch_iter, 
+		print i
+	'''
+
+	data = np.arange(11)
+	labels = data+1
+	batch_iter = batch_iterator(data, labels, batch_size=3, num_epochs=2)
+	for i in batch_iter:
+		print i
+	print data
+	print labels
 
 if __name__ == '__main__':
 
