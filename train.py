@@ -21,7 +21,7 @@ NUM_CLASSES = 2
 BATCH_SIZE = 64
 NUM_EPOCHS = 1
 
-#function to save model parameters
+#Function to save model parameters
 def write_summary(output_file, train_acc, train_loss, dev_acc, dev_loss):
 
 	with open(output_file) as outfile:

@@ -39,7 +39,7 @@ with tf.Graph().as_default():
 
 	with sess.as_default():
 
-		cbow = CBOW(vocab_size=VOCAB_SIZE, embedding_dim=EMBEDDING_DIM, num_classes=NUM_CLASSES)
+		cbow = CBOW(vocab_size=VOCAB_SIZE, embedding_dim=EMBEDDING_DIM, num_classes=NUM_CLASSES, batch_size=BATCH_SIZE)
 
 		#Initialize all variables
 		sess.run(tf.initialize_all_variables())
@@ -50,8 +50,8 @@ with tf.Graph().as_default():
 				cbow.input_x: x_batch,
 				cbow.input_y: y_batch
 			}
-			input_x,input_y,E,embedded_tokens,aggregated_embedding, scores, predictions = sess.run(
-				[cbow.input_x, cbow.input_y, cbow.E, cbow.embedded_tokens, cbow.aggregated_embedding, cbow.scores, cbow.predictions],
+			input_x,input_y,E,embedded_tokens,aggregated_embedding, scores, predictions,loss,accuracy = sess.run(
+				[cbow.input_x, cbow.input_y, cbow.E, cbow.embedded_tokens, cbow.aggregated_embedding, cbow.scores, cbow.predictions, cbow.loss, cbow.accuracy],
 				feed_dict)
 			print 'X: ', input_x.shape
 			print 'Y: ', input_y.shape
@@ -60,12 +60,13 @@ with tf.Graph().as_default():
 			print 'Aggregated embedding: ', aggregated_embedding.shape
 			print 'Scores: ', scores.shape
 			print 'Predictions: ', predictions
-
+			print 'Loss: ', loss
+			print 'Accuracy: ', accuracy
 
 		#Generate batches
 		#x_batches, y_batches = utils.get_batches(train_data, train_labels, BATCH_SIZE, NUM_EPOCHS)
 
 		#Training loop
-		train_step(np.reshape(train_data[0],(len(train_data[0]),BATCH_SIZE)), np.reshape(train_labels[0],(len(train_labels[0]),BATCH_SIZE)))
+		train_step(np.reshape(train_data[0],(BATCH_SIZE, len(train_data[0]))), np.reshape(train_labels[0],(BATCH_SIZE, len(train_labels[0]))))
 
 

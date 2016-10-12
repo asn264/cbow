@@ -4,6 +4,7 @@ October 8 2016
 '''
 
 import os
+import re
 import sys
 import numpy as np
 from collections import Counter
@@ -46,6 +47,32 @@ def get_data(train=False, test=False):
 	return data, labels
 
 
+def clean_str(string):
+
+	'''
+	From Denny Britz CNN tutorial, who originally borrowed it from:
+	https://github.com/yoonkim/CNN_sentence/blob/master/process_data.py
+	'''
+	string = re.sub(r"[^A-Za-z0-9(),!?\'\`]", " ", string)
+	string = re.sub(r"\'s", " \'s", string)
+	string = re.sub(r"\'ve", " \'ve", string)
+	string = re.sub(r"n\'t", " n\'t", string)
+	string = re.sub(r"\'re", " \'re", string)
+	string = re.sub(r"\'d", " \'d", string)
+	string = re.sub(r"\'ll", " \'ll", string)
+	string = re.sub(r",", " , ", string)
+	string = re.sub(r"!", " ! ", string)
+	string = re.sub(r"\(", " \( ", string)
+	string = re.sub(r"\)", " \) ", string)
+	string = re.sub(r"\?", " \? ", string)
+	string = re.sub(r"\s{2,}", " ", string)
+
+	#my own addition to get rid of weird break symbols
+	string = string.replace("<br \>", " \n")
+
+	return string.strip().lower()
+
+
 def get_dataset(data, vocab_size=10000, max_sentence_length=50):
 
 	'''
@@ -54,7 +81,7 @@ def get_dataset(data, vocab_size=10000, max_sentence_length=50):
 	'''
 	
 	#Get the top 10k-1 words in the corpus. Last word is UNK. Replace weird break symbols with newline chars.
-	corpus = ' '.join(review.replace('<br />',' \n') for review in data).lower().split()
+	corpus = ' '.join(clean_str(review) for review in data).split()
 	counts = Counter(corpus).most_common(vocab_size-1)
 	vocabulary = {token[0]:idx for idx,token in enumerate(counts)}
 
@@ -97,39 +124,38 @@ def shuffled_train_dev_split(data, labels, train_frac=0.8):
 	return shuffled_data[:train_split], shuffled_labels[:train_split], shuffled_data[train_split:], shuffled_labels[train_split:]
 
 
-def get_batches(data, labels, batch_size, num_epochs):
+def batch_iterator(data, labels, batch_size, num_epochs):
 
-	'''
+	data = np.asarray(data)
+	labels = np.asarray(labels)
+
+	data_size = len(data)
+	num_partitions = data_size/int(batch_size)
+
 	batch_data = []
 	batch_labels = []
 
-	delta = int(np.floor(len(data)/float(batch_size)))
-	data_size = len(data)
+	for j in range(num_epochs):
 
-	c_idx = 0
-	while len(batch_data) < data_size:
-		if c_idx+delta <= data_size:
-			batch_data.append(data[c_idx:c_idx+delta])
-			batch_labels.append(labels[c_idx:c_idx+delta])
-			c_idx += delta
-		else:
-			batch_data.append(data[c_idx:])
-			batch_labels.append(labels[c_idx:])
+		c_idx = 0
+		for i in range(num_partitions):
+			
+			yield data[c_idx:c_idx+batch_size], labels[c_idx:c_idx+batch_size]
+			c_idx += batch_size
+		
+		if num_partitions*batch_size != data_size:
 
-	return batch_data*num_epochs, batch_labels*num_epochs
-	'''
+			yield data[c_idx:], labels[c_idx:]
 
-	#do this arithmetic and change batch_size
-	batched_data = np.array_split(data,batch_size)
-	batched_labels = np.array_split(labels,batch_size)
-
-	return np.asarray([batched_data for i in range(num_epochs)]), np.asarray([batched_labels for i in range(num_epochs)])
 
 def main():
 
 	data, labels = get_data(train=True)
-	vocabulary, bow_data = get_dataset(data)
-
+	bow_data, vocabulary = get_dataset(data)
+	train_data, train_labels, dev_data, dev_labels = shuffled_train_dev_split(bow_data, labels)
+	print len(train_labels)
+	print len(dev_labels)
+	print len(labels)
 
 if __name__ == '__main__':
 
