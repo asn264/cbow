@@ -15,14 +15,16 @@ import tensorflow as tf
 import numpy as np
 
 #Set model parameters here
-EMBEDDING_DIM = 128
-VOCAB_SIZE = 10**4
-MAX_SENTENCE_LENGTH = 50
+EMBEDDING_DIM = 64
+MAX_SENTENCE_LENGTH = 30
 NUM_CLASSES = 2
+N_GRAM_VALUES = [1,2]
+VOCAB_SIZES = [10**3,10**2]
+MAX_NUM_TOKENS = sum([MAX_SENTENCE_LENGTH-val+1 for val in N_GRAM_VALUES])
 
 #Set training parameters here
-BATCH_SIZE = 64
-NUM_EPOCHS = 1
+BATCH_SIZE = 16
+NUM_EPOCHS = 10
 
 
 #Function to pickle model parameters as dictionary
@@ -32,7 +34,8 @@ def write_summary(output_file):
 
 		params = {
 			'EMBEDDING_DIM': EMBEDDING_DIM,
-			'VOCAB_SIZE': VOCAB_SIZE,
+			'VOCAB_SIZE': VOCAB_SIZES,
+			'N_GRAM_VALUES': N_GRAM_VALUES,
 			'MAX_SENTENCE_LENGTH': MAX_SENTENCE_LENGTH,
 			'NUM_CLASSES': NUM_CLASSES,
 			'BATCH_SIZE': BATCH_SIZE,
@@ -46,10 +49,14 @@ def write_summary(output_file):
 data, labels = utils.get_data(train=True)
 
 #Get the vocabulary
-vocabulary = utils.get_vocabulary(data, vocab_size=VOCAB_SIZE)
+vocabulary = utils.get_vocabulary(data, ngram_values=N_GRAM_VALUES, vocab_sizes=VOCAB_SIZES)
 
 #Get a truncated bow
-bow_data = utils.get_truncated_bow(vocabulary, data, max_sentence_length=MAX_SENTENCE_LENGTH)
+bow_data = utils.get_truncated_bow(vocabulary, data, max_sentence_length=MAX_SENTENCE_LENGTH, ngram_values=N_GRAM_VALUES)
+
+print data[0]
+print bow_data[0]
+sys.exit()
 
 #Train-dev split (also shuffles)
 train_data, train_labels, dev_data, dev_labels = utils.shuffled_train_dev_split(bow_data, labels, train_frac=0.80)
@@ -63,7 +70,7 @@ with tf.Graph().as_default():
 
 	with sess.as_default():
 
-		cbow = CBOW(vocab_size=VOCAB_SIZE, embedding_dim=EMBEDDING_DIM, num_classes=NUM_CLASSES)
+		cbow = CBOW(vocab_size=sum(VOCAB_SIZES)+1, embedding_dim=EMBEDDING_DIM, num_classes=NUM_CLASSES, max_num_tokens=MAX_NUM_TOKENS)
 
 		#Define training procedure
 		global_step = tf.Variable(0, name='global_step', trainable=False)
@@ -74,8 +81,6 @@ with tf.Graph().as_default():
 		#Initialize all variables
 		sess.run(tf.initialize_all_variables())
 
-		train_accuracy = None
-		train_loss = None
 		def train_step(x_batch, y_batch):
 
 			feed_dict = {

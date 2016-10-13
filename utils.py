@@ -7,6 +7,7 @@ import os
 import re
 import sys
 import numpy as np
+from nltk.util import ngrams
 from collections import Counter
 
 PATH_TO_TRAIN = '/Users/aditinair/Desktop/NLU_DL/assignment2/data/aclImdb/train/'
@@ -32,12 +33,12 @@ def get_data(train=False, test=False):
 
 			with open(path+'pos/'+f) as review:
 
-				data.append(review.read())
+				data.append(clean_str(review.read()))
 
 				#this is a probability distribution over class membership
 				labels.append([1,0])
 
-	'''
+	
 	for f in os.listdir(path+'neg/'):
 
 		#ignore hidden files
@@ -45,11 +46,11 @@ def get_data(train=False, test=False):
 
 			with open(path+'neg/'+f) as review:
 
-				data.append(review.read())
+				data.append(clean_str(review.read()))
 
 				#this is a probability distribution over class membership
 				labels.append([0,1])
-	'''
+	
 	#list of strings, list of ints
 	return np.asarray(data), np.asarray(labels)
 
@@ -80,21 +81,83 @@ def clean_str(string):
 	return string.strip().lower()
 
 
-def get_vocabulary(data, vocab_size=10**4):
+def get_vocabulary(data, ngram_values=[1,2], vocab_sizes=[10**4,10**2]):
 
-	#Get the top 10k-1 words in the corpus. Last word is UNK. Replace weird break symbols with newline chars.
-	corpus = ' '.join(clean_str(review) for review in data).split()
-	counts = Counter(corpus).most_common(vocab_size-1)
-	vocabulary = {token[0]:(idx+1) for idx,token in enumerate(counts)}
+	'''
+	ngrams is should be explicit list of the n-grams to include - so [1,3] will have unigrams and trigrams
+	vocab_sizes should have the corresponding vocab sizes for each n-gram
+	'''
 
-	#Add PADDING_TOKEN to vocab, with idx = last element in dictionary list
-	padding_idx = 0
-	vocabulary['PADDING_TOKEN'] = padding_idx
+	#Represent the data as a list of lists - one sub-list per review
+	corpus = []
+	for review in data:
+		corpus.append(review.split())
 
+	vocabulary = {'PADDING_TOKEN': 0}
+
+	#For each n value, get the top X n-grams in the corpus
+	for idx, n in enumerate(ngram_values):
+
+		#ngrams will be a list of all the ngrams in the corpus (for current n)
+		n_grams = []		
+		for review in corpus:
+			n_grams.extend( [' '.join(grams) for grams in ngrams(review,n)] )
+
+		#Count on ngrams
+		counts = Counter(n_grams).most_common(vocab_sizes[idx])
+
+		#Get the maximum idx in the dictionary
+		max_idx = max(vocabulary.values())
+		for gram_idx,gram in enumerate(counts):
+			#gram_idx starts at zero so add 1 always. gram is (token, count) so only take token.
+			vocabulary[gram[0]]=(max_idx+gram_idx+1)
+	
 	return vocabulary
 
 
-def get_truncated_bow(vocabulary, data, max_sentence_length=50):
+def get_truncated_bow(vocabulary, data, max_sentence_length=50, ngram_values=[1,2]):
+
+	'''
+	For each review:
+	1. truncate sentence
+	2. get all the required ngrams
+	3. transfer them to idx
+	'''
+
+	max_num_tokens = sum([max_sentence_length-val-1 for val in ngram_values])
+
+	bow_data = []
+	for review in data:
+		
+		#Cut off sentence lengths 
+		review_tokens = review.strip().split()[:max_sentence_length]
+
+		#Get idx for all ngrams in current review
+		curr_bow = []
+		for n in ngram_values:
+
+			for ngram in [' '.join(grams) for grams in ngrams(review_tokens,n)]:
+
+				try:
+					curr_bow.append(vocabulary[ngram])
+				except KeyError:
+					curr_bow.append(vocabulary['PADDING_TOKEN'])
+				if len(curr_bow) == max_num_tokens:
+					break
+			if len(curr_bow) == max_num_tokens:
+				break
+
+		#Padding if needed
+		diff = max_num_tokens - len(curr_bow)
+		if diff > 0:
+			curr_bow+=[vocabulary['PADDING_TOKEN']]*diff
+
+		bow_data.append(np.asarray(curr_bow))
+
+	return np.asarray(bow_data)
+
+
+def get_truncated_bow_DEPRECATED(vocabulary, data, max_sentence_length=50):
 
 	'''
 	For each review, get the full Bag of Words that corresponds to it
@@ -102,7 +165,7 @@ def get_truncated_bow(vocabulary, data, max_sentence_length=50):
 
 	bow_data = []
 	for review in data:
-		
+
 		#Cut off sentence lengths
 		review_tokens = review.strip().split()[:max_sentence_length]
 		bow_by_idx = []
@@ -121,51 +184,6 @@ def get_truncated_bow(vocabulary, data, max_sentence_length=50):
 
 	return np.asarray(bow_data)
 
-"""
-def get_dataset(data, vocab_size=10000, max_sentence_length=50):
-
-	'''
-	Define the vocabulary with all the unique words in the train and dev set
-	Get a BOW representation of each review
-	'''
-	
-	#Get the top 10k-1 words in the corpus. Last word is UNK. Replace weird break symbols with newline chars.
-	corpus = ' '.join(clean_str(review) for review in data).split()
-	counts = Counter(corpus).most_common(vocab_size-1)
-	vocabulary = {token[0]:(idx+1) for idx,token in enumerate(counts)}
-
-	#Add PADDING_TOKEN to vocab, with idx = last element in dictionary list
-	padding_idx = 0
-	vocabulary['PADDING_TOKEN'] = padding_idx
-
-	#Clean up
-	del corpus
-	del counts
-
-	#Tokenize reviews, convert to vocab idx, and throw out words not in the vocabulary. Limit max_sentence_length to 50.
-	bow_data = []
-	for review in data:
-		
-		#Tokenize reviews
-		truncated_bow = review.strip().split()[:max_sentence_length]
-
-		#Convert tokens to corresponding vocab idx, if possible
-		bow_by_idx = []
-		for token in truncated_bow:
-			try:
-				bow_by_idx.append(vocabulary[token])
-			except KeyError:
-				#Zero out unks
-				bow_by_idx.append(padding_idx)
-
-		#padding if needed
-		diff = max_sentence_length - len(bow_by_idx)
-		if diff > 0:
-			bow_by_idx += [padding_idx]*diff
-		bow_data.append(np.asarray(bow_by_idx))
-
-	return np.asarray(bow_data), vocabulary
-"""
 
 def shuffled_train_dev_split(data, labels, train_frac=0.8):
 
@@ -181,8 +199,8 @@ def shuffled_train_dev_split(data, labels, train_frac=0.8):
 
 def batch_iterator(data, labels, batch_size, num_epochs=1):
 
-	data = np.asarray(data)
-	labels = np.asarray(labels)
+	data = np.copy(np.asarray(data))
+	labels = np.copy(np.asarray(labels))
 
 	data_size = len(data)
 	num_partitions = data_size/int(batch_size)
@@ -199,25 +217,40 @@ def batch_iterator(data, labels, batch_size, num_epochs=1):
 			
 			yield np.asarray(data[c_idx:]), np.asarray(labels[c_idx:])
 
+		shuffled_idx = np.random.permutation(len(data))
+		data = data[shuffled_idx]
+		labels = labels[shuffled_idx]
+
+def get_vocabulary_DEPRECATED(data, vocab_size=10**4):
+
+	'''Concise but only works for unigrams...'''
+
+	#Get the top 10k-1 words in the corpus. Last word is UNK. Replace weird break symbols with newline chars.
+	corpus = ' '.join(clean_str(review) for review in data).split()
+	
+	counts = Counter(corpus).most_common(vocab_size-1)
+	vocabulary = {token[0]:(idx+1) for idx,token in enumerate(counts)}
+
+	#Add PADDING_TOKEN to vocab, with idx = last element in dictionary list
+	padding_idx = 0
+	vocabulary['PADDING_TOKEN'] = padding_idx
+
+	return vocabulary
+
 
 def main():
 
-	'''
-	data, labels = get_data(train=True)
-	bow_data, vocabulary = get_dataset(data)
-	train_data, train_labels, dev_data, dev_labels = shuffled_train_dev_split(bow_data, labels)
-	batch_iter = batch_iterator(train_data, train_labels, batch_size=64, num_epochs=1)
-	for i in batch_iter, 
-		print i
-	'''
+	#Little test data set for ngram tweak of get_vocabulary
+	data = ['Its now pretty clear that Donald Trump has been using his presidential campaign to promote his various business ventures.',
+	 'Remember when he touted his Turnberry, Scotland, golf course as a beneficiary of Great Britains exit from the European Union this summer?',
+	 'But if Trump hoped his campaign would elevate the value of his brand, it looks like just the opposite is happening.']
 
-	data = np.arange(11)
-	labels = data+1
-	batch_iter = batch_iterator(data, labels, batch_size=3, num_epochs=2)
-	for i in batch_iter:
-		print i
-	print data
-	print labels
+	vocabulary = get_vocabulary(data, ngram_values=[1,2], vocab_sizes=[10,5])
+	bow_trunc = get_truncated_bow(vocabulary, data, max_sentence_length=10, ngram_values=[1,2])
+
+	print vocabulary
+	print bow_trunc
+
 
 if __name__ == '__main__':
 

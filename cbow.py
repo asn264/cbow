@@ -8,10 +8,10 @@ import sys
 
 class CBOW(object):
 
-	def __init__(self, vocab_size=10**4, embedding_dim=128, num_classes=2, max_sentence_length=50):
+	def __init__(self, vocab_size, embedding_dim=128, num_classes=2, max_num_tokens=50):
 
 		#shape is [None,None] - meaning we can feed in any number of samples and each sample can have arbitrary length
-		self.input_x = tf.placeholder(tf.int32, shape=[None, max_sentence_length], name='input_x')
+		self.input_x = tf.placeholder(tf.int32, shape=[None, max_num_tokens], name='input_x')
 
 		#shape is [None,num_classes] - meaning we can feed in any number of samples 
 		#but each sample must be labelled with a probability distribution over all classes - so floats!
@@ -31,7 +31,7 @@ class CBOW(object):
 		b = tf.Variable(tf.constant(0.1), num_classes, name='b')
 
 		#Wx + b for each input x gives the scores, then do nonlinearity
-		self.scores = tf.nn.relu(tf.matmul(self.aggregated_embedding,W)+b)
+		self.scores = tf.nn.sigmoid(tf.matmul(self.aggregated_embedding,W)+b)
 
 		#Prediction by argmax
 		#Don't need to do softmax here bc it won't change the relative scale and therefore won't change prediction

@@ -21,7 +21,6 @@ if EVAL_TEST=='test':
 	#Load data
 	data, labels = utils.get_data(test=True)
 
-
 	#Get truncated BoW
 	bow_data = utils.get_truncated_bow(vocabulary, data, max_sentence_length=params['MAX_SENTENCE_LENGTH'])
 
