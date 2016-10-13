@@ -8,6 +8,7 @@ import os
 import sys
 import time
 import utils
+import pickle
 import datetime
 from cbow import *
 import tensorflow as tf
@@ -23,33 +24,36 @@ NUM_CLASSES = 2
 BATCH_SIZE = 64
 NUM_EPOCHS = 1
 
-#Function to save model parameters
-def write_summary(output_file, train_acc, train_loss, dev_acc, dev_loss):
 
-	with open(output_file) as outfile:
+#Function to pickle model parameters as dictionary
+def write_summary(output_file):
 
-		outfile.write('EMBEDDING_DIM: ' + str(EMBEDDING_DIM))
-		outfile.write('\nVOCAB_SIZE: ' + str(VOCAB_SIZE))
-		outfile.write('\nMAX_SENTENCE_LENGTH: ' + str(MAX_SENTENCE_LENGTH))
-		outfile.write('\nNUM_CLASSES:' + str(NUM_CLASSES))
-		outfile.write('\nBATCH_SIZE: ' + str(BATCH_SIZE))
-		outfile.write('\nNUM_EPOCHS: ' + str(NUM_EPOCHS))
+	with open(output_file, 'wb') as outfile:
 
-		outfile.write('\n\nTrain Accuracy: ' + str(train_acc))
-		outfile.write('\nTrain Loss: ' + str(train_loss))
+		params = {
+			'EMBEDDING_DIM': EMBEDDING_DIM,
+			'VOCAB_SIZE': VOCAB_SIZE,
+			'MAX_SENTENCE_LENGTH': MAX_SENTENCE_LENGTH,
+			'NUM_CLASSES': NUM_CLASSES,
+			'BATCH_SIZE': BATCH_SIZE,
+			'NUM_EPOCHS': NUM_EPOCHS
+		}
 
-		outfile.write('\n\nDev Accuracy: ' + str(dev_acc))
-		outfile.write('\nDev Loss: ' + str(dev_loss))
+		pickle.dump(params,outfile)
 
 
 #Load data
 data, labels = utils.get_data(train=True)
 
-#Get the vocabulary and transform to bag of words
-bow_data, vocabulary = utils.get_dataset(data, vocab_size=VOCAB_SIZE, max_sentence_length=MAX_SENTENCE_LENGTH)
+#Get the vocabulary
+vocabulary = utils.get_vocabulary(data, vocab_size=VOCAB_SIZE)
+
+#Get a truncated bow
+bow_data = utils.get_truncated_bow(vocabulary, data, max_sentence_length=MAX_SENTENCE_LENGTH)
 
 #Train-dev split (also shuffles)
 train_data, train_labels, dev_data, dev_labels = utils.shuffled_train_dev_split(bow_data, labels, train_frac=0.80)
+
 
 # TRAINING
 # ---------------------------------------------------------------------------------------------------------
@@ -102,8 +106,8 @@ with tf.Graph().as_default():
         print "Dev: step {}, loss {:g}, acc {:g}".format(dev_step, dev_loss, dev_accuracy)
 
         #Save model in directory with name = current UTC timestamp
-        save_directory_name = str(time.time())
-        outdir = os.getcwd()+save_directory_name+'/'
+        save_directory_name = str(int(time.time()))
+        outdir = os.getcwd()+'/'+save_directory_name+'/'
 
         #Check if the directory already exists
         if not os.path.exists(outdir):
@@ -112,13 +116,17 @@ with tf.Graph().as_default():
         	os.makedirs(outdir)
         	
         	#Write summary to text file with params, accs and losses
-        	write_summary(outdir+'params.txt', train_accuracy, train_loss, dev_accuracy, dev_loss)
+        	write_summary(outdir+'params.p')
+
+        	#Pickle the vocabulary dict
+        	with open(outdir+'vocabulary.p', 'wb') as vocab_pickle:
+	        	pickle.dump(vocabulary, vocab_pickle)
 
         	#tf Saver
         	saver = tf.train.Saver(tf.all_variables())
-        	path = saver.save(sess, save_directory_name, global_step=global_step)
+        	path = saver.save(sess, outdir+'model.saved', global_step=global_step)
         	print 'Saved model and summary to ' + path
 
-        #this will never happen... 
+        #this will never happen bc directory names are all unix timestamps...
         else:
         	print 'Unable to save model'

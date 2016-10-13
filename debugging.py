@@ -39,7 +39,7 @@ with tf.Graph().as_default():
 
 	with sess.as_default():
 
-		cbow = CBOW(vocab_size=VOCAB_SIZE, embedding_dim=EMBEDDING_DIM, num_classes=NUM_CLASSES)
+		cbow = CBOW(vocab_size=VOCAB_SIZE, embedding_dim=EMBEDDING_DIM, num_classes=NUM_CLASSES, max_sentence_length=MAX_SENTENCE_LENGTH)
 
 		#Initialize all variables
 		sess.run(tf.initialize_all_variables())

@@ -8,10 +8,10 @@ import sys
 
 class CBOW(object):
 
-	def __init__(self, vocab_size=10**4, embedding_dim=128, num_classes=2):
+	def __init__(self, vocab_size=10**4, embedding_dim=128, num_classes=2, max_sentence_length=50):
 
 		#shape is [None,None] - meaning we can feed in any number of samples and each sample can have arbitrary length
-		self.input_x = tf.placeholder(tf.int32, shape=[None, None], name='input_x')
+		self.input_x = tf.placeholder(tf.int32, shape=[None, max_sentence_length], name='input_x')
 
 		#shape is [None,num_classes] - meaning we can feed in any number of samples 
 		#but each sample must be labelled with a probability distribution over all classes - so floats!
@@ -24,7 +24,7 @@ class CBOW(object):
 		self.embedded_tokens = tf.nn.embedding_lookup(self.E, self.input_x)
 
 		#aggregate the embedding rows for each sample in the input
-		self.aggregated_embedding = tf.reduce_mean(self.embedded_tokens,reduction_indices=1)
+		self.aggregated_embedding = tf.reduce_sum(self.embedded_tokens,reduction_indices=1)
 
 		#MLP
 		W = tf.Variable(tf.truncated_normal([embedding_dim,num_classes]), name='W')

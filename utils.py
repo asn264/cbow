@@ -80,6 +80,48 @@ def clean_str(string):
 	return string.strip().lower()
 
 
+def get_vocabulary(data, vocab_size=10**4):
+
+	#Get the top 10k-1 words in the corpus. Last word is UNK. Replace weird break symbols with newline chars.
+	corpus = ' '.join(clean_str(review) for review in data).split()
+	counts = Counter(corpus).most_common(vocab_size-1)
+	vocabulary = {token[0]:(idx+1) for idx,token in enumerate(counts)}
+
+	#Add PADDING_TOKEN to vocab, with idx = last element in dictionary list
+	padding_idx = 0
+	vocabulary['PADDING_TOKEN'] = padding_idx
+
+	return vocabulary
+
+
+def get_truncated_bow(vocabulary, data, max_sentence_length=50):
+
+	'''
+	For each review, get the full Bag of Words that corresponds to it
+	'''
+
+	bow_data = []
+	for review in data:
+		
+		#Cut off sentence lengths
+		review_tokens = review.strip().split()[:max_sentence_length]
+		bow_by_idx = []
+		for token in review_tokens:
+			try:
+				bow_by_idx.append(vocabulary[token])
+			except KeyError:
+				bow_by_idx.append(vocabulary['PADDING_TOKEN'])
+
+		#Padding if needed
+		diff = max_sentence_length - len(bow_by_idx)
+		if diff > 0:
+			bow_by_idx+=[vocabulary['PADDING_TOKEN']]*diff
+
+		bow_data.append(np.asarray(bow_by_idx))
+
+	return np.asarray(bow_data)
+
+"""
 def get_dataset(data, vocab_size=10000, max_sentence_length=50):
 
 	'''
@@ -105,7 +147,7 @@ def get_dataset(data, vocab_size=10000, max_sentence_length=50):
 	for review in data:
 		
 		#Tokenize reviews
-		truncated_bow = review.strip().split()
+		truncated_bow = review.strip().split()[:max_sentence_length]
 
 		#Convert tokens to corresponding vocab idx, if possible
 		bow_by_idx = []
@@ -113,11 +155,8 @@ def get_dataset(data, vocab_size=10000, max_sentence_length=50):
 			try:
 				bow_by_idx.append(vocabulary[token])
 			except KeyError:
-				#Don't include unknowns bc Zipfian distribution
-				pass
-			#Grab at most fifty known words form the sentence
-			if len(bow_by_idx) == max_sentence_length:
-				break
+				#Zero out unks
+				bow_by_idx.append(padding_idx)
 
 		#padding if needed
 		diff = max_sentence_length - len(bow_by_idx)
@@ -126,7 +165,7 @@ def get_dataset(data, vocab_size=10000, max_sentence_length=50):
 		bow_data.append(np.asarray(bow_by_idx))
 
 	return np.asarray(bow_data), vocabulary
-
+"""
 
 def shuffled_train_dev_split(data, labels, train_frac=0.8):
 
