@@ -13,17 +13,19 @@ import datetime
 from cbow import *
 import tensorflow as tf
 import numpy as np
+import numpy.ma as ma
 
 #Set model parameters here
-EMBEDDING_DIM = 64
-MAX_SENTENCE_LENGTH = 30
+EMBEDDING_DIM = 128
+MAX_SENTENCE_LENGTH = 50
 NUM_CLASSES = 2
 N_GRAM_VALUES = [1,2]
-VOCAB_SIZES = [10**3,10**2]
+VOCAB_SIZES = [10**4,10**4]
 MAX_NUM_TOKENS = sum([MAX_SENTENCE_LENGTH-val+1 for val in N_GRAM_VALUES])
+L2_REG_LAMBDA = 0.5
 
 #Set training parameters here
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 NUM_EPOCHS = 10
 
 
@@ -54,10 +56,6 @@ vocabulary = utils.get_vocabulary(data, ngram_values=N_GRAM_VALUES, vocab_sizes=
 #Get a truncated bow
 bow_data = utils.get_truncated_bow(vocabulary, data, max_sentence_length=MAX_SENTENCE_LENGTH, ngram_values=N_GRAM_VALUES)
 
-print data[0]
-print bow_data[0]
-sys.exit()
-
 #Train-dev split (also shuffles)
 train_data, train_labels, dev_data, dev_labels = utils.shuffled_train_dev_split(bow_data, labels, train_frac=0.80)
 
@@ -70,7 +68,7 @@ with tf.Graph().as_default():
 
 	with sess.as_default():
 
-		cbow = CBOW(vocab_size=sum(VOCAB_SIZES)+1, embedding_dim=EMBEDDING_DIM, num_classes=NUM_CLASSES, max_num_tokens=MAX_NUM_TOKENS)
+		cbow = CBOW(vocab_size=sum(VOCAB_SIZES)+1, embedding_dim=EMBEDDING_DIM, num_classes=NUM_CLASSES, max_num_tokens=MAX_NUM_TOKENS, l2_reg_lambda=L2_REG_LAMBDA)
 
 		#Define training procedure
 		global_step = tf.Variable(0, name='global_step', trainable=False)
@@ -85,7 +83,7 @@ with tf.Graph().as_default():
 
 			feed_dict = {
 				cbow.input_x: x_batch,
-				cbow.input_y: y_batch
+				cbow.input_y: y_batch,
 			}
 			_, train_step,train_loss,train_accuracy = sess.run(
 				[train_op, global_step, cbow.loss, cbow.accuracy],

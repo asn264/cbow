@@ -124,7 +124,7 @@ def get_truncated_bow(vocabulary, data, max_sentence_length=50, ngram_values=[1,
 	3. transfer them to idx
 	'''
 
-	max_num_tokens = sum([max_sentence_length-val-1 for val in ngram_values])
+	max_num_tokens = sum([max_sentence_length-val+1 for val in ngram_values])
 
 	bow_data = []
 	for review in data:
