@@ -23,6 +23,7 @@ N_GRAM_VALUES = [1,2]
 VOCAB_SIZES = [10**4,10**4]
 MAX_NUM_TOKENS = sum([MAX_SENTENCE_LENGTH-val+1 for val in N_GRAM_VALUES])
 L2_REG_LAMBDA = 0.5
+DROPOUT_KEEP_PROB = 1.0
 
 #Set training parameters here
 BATCH_SIZE = 32
@@ -41,7 +42,8 @@ def write_summary(output_file):
 			'MAX_SENTENCE_LENGTH': MAX_SENTENCE_LENGTH,
 			'NUM_CLASSES': NUM_CLASSES,
 			'BATCH_SIZE': BATCH_SIZE,
-			'NUM_EPOCHS': NUM_EPOCHS
+			'NUM_EPOCHS': NUM_EPOCHS,
+                        'DROPOUT_KEEP_PROB': DROPOUT_KEEP_PROB
 		}
 
 		pickle.dump(params,outfile)
@@ -81,9 +83,13 @@ with tf.Graph().as_default():
 
 		def train_step(x_batch, y_batch):
 
+                        mask = utils.get_batch_mask(x_batch,embedding_dim=EMBEDDING_DIM,max_num_tokens=MAX_NUM_TOKENS)
+
 			feed_dict = {
 				cbow.input_x: x_batch,
+                                cbow.input_x_mask: mask,
 				cbow.input_y: y_batch,
+                                cbow.dropout_keep_prob: DROPOUT_KEEP_PROB
 			}
 			_, train_step,train_loss,train_accuracy = sess.run(
 				[train_op, global_step, cbow.loss, cbow.accuracy],
@@ -98,15 +104,53 @@ with tf.Graph().as_default():
         	train_step(x_batch, y_batch)
         	current_step = tf.train.global_step(sess, global_step)
 
-        #Report dev accuracy
-        dev_feed_dict = {
-        	cbow.input_x: dev_data,
-        	cbow.input_y: dev_labels
-        }
-        dev_step, dev_loss, dev_accuracy = sess.run(
-        	[global_step, cbow.loss, cbow.accuracy],
-        	dev_feed_dict)
-        print "Dev: step {}, loss {:g}, acc {:g}".format(dev_step, dev_loss, dev_accuracy)
+
+        #Report dev accuracy - use iterator because otherwise masking is very slow on the full batch
+        dev_iter = utils.batch_iterator(dev_data, dev_labels, batch_size=BATCH_SIZE, num_epochs=1)
+        dev_acc_sum = 0.0
+        dev_loss_sum = 0.0
+        dev_size_sum = 0.0
+        l2_loss = None
+        counter = 1
+        for i in dev_iter:
+
+                print 'Batch ' + str(counter) + ' for dev_iter'
+                counter += 1
+
+                x_batch = i[0]
+                y_batch = i[1]
+                mask = utils.get_batch_mask(x_batch,embedding_dim=EMBEDDING_DIM,max_num_tokens=MAX_NUM_TOKENS))
+                
+                dev_feed_dict = {
+                        cbow.input_x: x_batch,
+                        cbow.input_x_mask: mask,
+                        cbow.input_y: y_batch,
+                        cbow.dropout_keep_prob: 1.0
+                }
+
+                dev_loss, l2_loss, dev_accuracy = sess.run(
+        	       [cbow.loss, cbow.l2_loss, cbow.accuracy],
+        	       dev_feed_dict)
+
+                #Hacky arithmetic to speed up masking array problem
+                batch_size = len(x_batch)
+
+                #this is reported by the model as a mean on the batch size
+                dev_acc_sum += (dev_accuracy * batch_size)
+                
+                #dev_loss is reported by the model as (mean loss on batch size + lambda*l2_loss)
+                dev_loss_sum += (dev_loss-L2_REG_LAMBDA*l2_loss)*batch_size
+                
+                dev_size_sum += float(batch_size)
+                
+                if l2_loss is None:
+                        l2_loss = L2_REG_LAMBDA*l2_loss
+
+        #Finally report Dev results
+        print 'Dev Accuracy: ' + str( dev_acc_sum/dev_size_sum )
+        print 'Dev Loss: ' + str( (dev_loss_sum/dev_size_sum) + l2_loss )
+
+        #print "Dev: step {}, loss {:g}, acc {:g}".format(dev_step, dev_loss, dev_accuracy)
 
         #Save model in directory with name = current UTC timestamp
         save_directory_name = str(int(time.time()))

@@ -157,34 +157,6 @@ def get_truncated_bow(vocabulary, data, max_sentence_length=50, ngram_values=[1,
 	return np.asarray(bow_data)
 
 
-def get_truncated_bow_DEPRECATED(vocabulary, data, max_sentence_length=50):
-
-	'''
-	For each review, get the full Bag of Words that corresponds to it
-	'''
-
-	bow_data = []
-	for review in data:
-
-		#Cut off sentence lengths
-		review_tokens = review.strip().split()[:max_sentence_length]
-		bow_by_idx = []
-		for token in review_tokens:
-			try:
-				bow_by_idx.append(vocabulary[token])
-			except KeyError:
-				bow_by_idx.append(vocabulary['PADDING_TOKEN'])
-
-		#Padding if needed
-		diff = max_sentence_length - len(bow_by_idx)
-		if diff > 0:
-			bow_by_idx+=[vocabulary['PADDING_TOKEN']]*diff
-
-		bow_data.append(np.asarray(bow_by_idx))
-
-	return np.asarray(bow_data)
-
-
 def shuffled_train_dev_split(data, labels, train_frac=0.8):
 
 	np.random.seed(10)
@@ -221,21 +193,29 @@ def batch_iterator(data, labels, batch_size, num_epochs=1):
 		data = data[shuffled_idx]
 		labels = labels[shuffled_idx]
 
-def get_vocabulary_DEPRECATED(data, vocab_size=10**4):
 
-	'''Concise but only works for unigrams...'''
+def get_batch_mask(x_batch,embedding_dim,max_num_tokens):
 
-	#Get the top 10k-1 words in the corpus. Last word is UNK. Replace weird break symbols with newline chars.
-	corpus = ' '.join(clean_str(review) for review in data).split()
-	
-	counts = Counter(corpus).most_common(vocab_size-1)
-	vocabulary = {token[0]:(idx+1) for idx,token in enumerate(counts)}
+        mask = None
+        for batch in x_batch:
+                c_mask = None
+                for idx in batch:
+                        if idx == 0:
+                                if c_mask is None:
+                                        c_mask = np.zeros(EMBEDDING_DIM)
+                                else:
+                                        c_mask = np.vstack([c_mask,np.zeros(EMBEDDING_DIM)])
+                        else:
+                                if c_mask is None:
+                                        c_mask = np.ones(EMBEDDING_DIM)
+                                else: 
+                                        c_mask = np.vstack([c_mask,np.ones(EMBEDDING_DIM)])
+                if mask is None:
+                        mask = c_mask
+                else:
+                        mask = np.vstack([mask,c_mask])
 
-	#Add PADDING_TOKEN to vocab, with idx = last element in dictionary list
-	padding_idx = 0
-	vocabulary['PADDING_TOKEN'] = padding_idx
-
-	return vocabulary
+        return mask.reshape((len(x_batch),MAX_NUM_TOKENS,EMBEDDING_DIM))
 
 
 def main():
