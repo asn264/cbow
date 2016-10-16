@@ -34,6 +34,10 @@ class CBOW(object):
 		#aggregate the embedding rows for each sample in the input
 		self.aggregated_embedding = tf.reduce_sum(self.masked_tokens,reduction_indices=1)
 
+		#do the mean by dividing by the number of non-zero tokens in each review
+		self.x_divs = tf.placeholder(tf.float32,shape=[None,embedding_dim],name='x_divs')
+		#self.aggregated_embedding = tf.truediv(self.aggregated_embedding,self.x_divs)
+
 		#dropout
 		self.aggregated_embedding_dropout = tf.nn.dropout(self.aggregated_embedding,self.dropout_keep_prob)
 
@@ -42,7 +46,6 @@ class CBOW(object):
 		b = tf.Variable(tf.constant(0.1), num_classes, name='b')
 
 		#Wx + b for each input x gives the scores, then do nonlinearity
-		#self.scores = tf.matmul(self.aggregated_embedding_dropout,W)+b
 		self.scores = tf.nn.sigmoid(tf.matmul(self.aggregated_embedding_dropout,W)+b)
 
 		#Prediction by argmax

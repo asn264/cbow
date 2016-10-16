@@ -52,6 +52,9 @@ with graph.as_default():
 
 		#Get placeholders from graph
 		input_x = graph.get_operation_by_name('input_x').outputs[0]
+		input_x_mask = graph.get_operation_by_name('input_x_mask').outputs[0]
+		x_divs = graph.get_operation_by_name('x_divs').outputs[0]
+		dropout_keep_prob = graph.get_operation_by_name('dropout_keep_prob').outputs[0]
 
 		#Tensors to evaluate 
 		predictions = graph.get_operation_by_name('predictions').outputs[0]
@@ -60,7 +63,9 @@ with graph.as_default():
 
 		batch_iter = utils.batch_iterator(bow_data, labels, params['BATCH_SIZE'], num_epochs=1)
 		for i in batch_iter:
-			batch_preds = sess.run(predictions, {input_x: i[0]})
+			mask = utils.get_mask(i[0],embedding_dim=params['EMBEDDING_DIM'],max_num_tokens=params['MAX_NUM_TOKENS'])
+            nonzero_divs = utils.get_batch_nonzeros(x_batch,embedding_dim=EMBEDDING_DIM)
+			batch_preds = sess.run(predictions, {input_x: i[0], input_x_mask: mask, x_divs: nonzero_divs, dropout_keep_prob: 1.0})
 			try:
 				all_predictions = np.concatenate([all_predictions, batch_preds])
 			except ValueError:

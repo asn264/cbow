@@ -17,13 +17,13 @@ import numpy.ma as ma
 
 #Set model parameters here
 EMBEDDING_DIM = 128
-MAX_SENTENCE_LENGTH = 50
+MAX_SENTENCE_LENGTH = 70
 NUM_CLASSES = 2
-N_GRAM_VALUES = [1,2]
-VOCAB_SIZES = [10**4,10**4]
+N_GRAM_VALUES = [1,2,3]
+VOCAB_SIZES = [10**4,10**4,10**2]
 MAX_NUM_TOKENS = sum([MAX_SENTENCE_LENGTH-val+1 for val in N_GRAM_VALUES])
 L2_REG_LAMBDA = 0.5
-DROPOUT_KEEP_PROB = 1.0
+DROPOUT_KEEP_PROB = 0.5
 
 #Set training parameters here
 BATCH_SIZE = 32
@@ -43,7 +43,8 @@ def write_summary(output_file):
 			'NUM_CLASSES': NUM_CLASSES,
 			'BATCH_SIZE': BATCH_SIZE,
 			'NUM_EPOCHS': NUM_EPOCHS,
-                        'DROPOUT_KEEP_PROB': DROPOUT_KEEP_PROB
+                        'DROPOUT_KEEP_PROB': DROPOUT_KEEP_PROB,
+                        'MAX_NUM_TOKENS': MAX_NUM_TOKENS
 		}
 
 		pickle.dump(params,outfile)
@@ -84,10 +85,11 @@ with tf.Graph().as_default():
 		def train_step(x_batch, y_batch):
 
                         mask = utils.get_batch_mask(x_batch,embedding_dim=EMBEDDING_DIM,max_num_tokens=MAX_NUM_TOKENS)
-
+                        nonzero_divs = utils.get_batch_nonzeros(x_batch,embedding_dim=EMBEDDING_DIM)
 			feed_dict = {
 				cbow.input_x: x_batch,
                                 cbow.input_x_mask: mask,
+                                cbow.x_divs: nonzero_divs,
 				cbow.input_y: y_batch,
                                 cbow.dropout_keep_prob: DROPOUT_KEEP_PROB
 			}
@@ -107,11 +109,11 @@ with tf.Graph().as_default():
 
         #Report dev accuracy - use iterator because otherwise masking is very slow on the full batch
         dev_iter = utils.batch_iterator(dev_data, dev_labels, batch_size=BATCH_SIZE, num_epochs=1)
-        dev_acc_sum = 0.0
+        all_dev_predictions = []
         dev_loss_sum = 0.0
-        dev_size_sum = 0.0
         l2_loss = None
         counter = 1
+
         for i in dev_iter:
 
                 print 'Batch ' + str(counter) + ' for dev_iter'
@@ -119,36 +121,34 @@ with tf.Graph().as_default():
 
                 x_batch = i[0]
                 y_batch = i[1]
-                mask = utils.get_batch_mask(x_batch,embedding_dim=EMBEDDING_DIM,max_num_tokens=MAX_NUM_TOKENS))
+                mask = utils.get_batch_mask(x_batch,embedding_dim=EMBEDDING_DIM,max_num_tokens=MAX_NUM_TOKENS)
+                nonzero_divs = utils.get_batch_nonzeros(x_batch,embedding_dim=EMBEDDING_DIM)
                 
                 dev_feed_dict = {
                         cbow.input_x: x_batch,
                         cbow.input_x_mask: mask,
+                        cbow.x_divs: nonzero_divs,
                         cbow.input_y: y_batch,
                         cbow.dropout_keep_prob: 1.0
                 }
 
-                dev_loss, l2_loss, dev_accuracy = sess.run(
-        	       [cbow.loss, cbow.l2_loss, cbow.accuracy],
+                dev_loss, l2_loss, batch_preds = sess.run(
+        	       [cbow.loss, cbow.l2_loss, cbow.predictions],
         	       dev_feed_dict)
 
-                #Hacky arithmetic to speed up masking array problem
-                batch_size = len(x_batch)
-
-                #this is reported by the model as a mean on the batch size
-                dev_acc_sum += (dev_accuracy * batch_size)
+                all_dev_predictions = np.concatenate([all_dev_predictions, batch_preds])
                 
                 #dev_loss is reported by the model as (mean loss on batch size + lambda*l2_loss)
-                dev_loss_sum += (dev_loss-L2_REG_LAMBDA*l2_loss)*batch_size
-                
-                dev_size_sum += float(batch_size)
+                dev_loss_sum += (dev_loss-L2_REG_LAMBDA*l2_loss)*len(x_batch)
                 
                 if l2_loss is None:
                         l2_loss = L2_REG_LAMBDA*l2_loss
 
         #Finally report Dev results
-        print 'Dev Accuracy: ' + str( dev_acc_sum/dev_size_sum )
-        print 'Dev Loss: ' + str( (dev_loss_sum/dev_size_sum) + l2_loss )
+        dev_label_values = np.argmax(dev_labels,axis=1)
+        correct_dev_predictions = float(sum(ma.masked_equal(all_dev_predictions,dev_label_values).mask))
+        print 'Dev Accuracy: ' + str( correct_dev_predictions/len(dev_label_values) )
+        print 'Dev Loss: ' + str( (dev_loss_sum/len(dev_label_values)) + l2_loss )
 
         #print "Dev: step {}, loss {:g}, acc {:g}".format(dev_step, dev_loss, dev_accuracy)
 

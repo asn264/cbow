@@ -202,20 +202,30 @@ def get_batch_mask(x_batch,embedding_dim,max_num_tokens):
                 for idx in batch:
                         if idx == 0:
                                 if c_mask is None:
-                                        c_mask = np.zeros(EMBEDDING_DIM)
+                                        c_mask = np.zeros(embedding_dim)
                                 else:
-                                        c_mask = np.vstack([c_mask,np.zeros(EMBEDDING_DIM)])
+                                        c_mask = np.vstack([c_mask,np.zeros(embedding_dim)])
                         else:
                                 if c_mask is None:
-                                        c_mask = np.ones(EMBEDDING_DIM)
+                                        c_mask = np.ones(embedding_dim)
                                 else: 
-                                        c_mask = np.vstack([c_mask,np.ones(EMBEDDING_DIM)])
+                                        c_mask = np.vstack([c_mask,np.ones(embedding_dim)])
                 if mask is None:
                         mask = c_mask
                 else:
                         mask = np.vstack([mask,c_mask])
 
-        return mask.reshape((len(x_batch),MAX_NUM_TOKENS,EMBEDDING_DIM))
+        return mask.reshape((len(x_batch),max_num_tokens,embedding_dim))
+
+
+def get_batch_nonzeros(x_batch,embedding_dim):
+
+	nonzero_counts = []
+	for batch in x_batch:
+		#count the number of non-zero idx in the batch, then make an array of size embedding_dim 
+		nonzero_counts.append(np.full(embedding_dim,np.count_nonzero(batch)))
+
+	return np.array(nonzero_counts)
 
 
 def main():
