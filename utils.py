@@ -130,7 +130,9 @@ def get_truncated_bow(vocabulary, data, max_sentence_length=50, ngram_values=[1,
 	for review in data:
 		
 		#Cut off sentence lengths 
-		review_tokens = review.strip().split()[:max_sentence_length]
+		#review_tokens = review.strip().split()[:max_sentence_length]
+		review_tokens = review.strip().split()[-max_sentence_length:]
+
 
 		#Get idx for all ngrams in current review
 		curr_bow = []

@@ -8,7 +8,7 @@ import numpy.ma as ma
 SAVE_DIRECTORY_PATH = '/Users/aditinair/Desktop/NLU_DL/assignment2/cbow/1476331961/'
 
 #Evaluates combined training/dev set if false
-EVAL_TEST=True
+EVAL_TEST=False
 
 #Load up vocabulary
 with open(SAVE_DIRECTORY_PATH+'vocabulary.p') as vocab_path:
@@ -83,5 +83,8 @@ else:
 num_samples = len(labels)
 print 'Num Samples: ', str(num_samples)
 print 'Accuracy: ', str( correct_predictions/num_samples )
+print 'Parameters:'
+print params
+
 
 

@@ -20,14 +20,14 @@ EMBEDDING_DIM = 128
 MAX_SENTENCE_LENGTH = 70
 NUM_CLASSES = 2
 N_GRAM_VALUES = [1,2,3]
-VOCAB_SIZES = [10**4,10**4,10**2]
+VOCAB_SIZES = [10**4,10**4,10**3]
 MAX_NUM_TOKENS = sum([MAX_SENTENCE_LENGTH-val+1 for val in N_GRAM_VALUES])
 L2_REG_LAMBDA = 0.5
 DROPOUT_KEEP_PROB = 0.5
 
 #Set training parameters here
 BATCH_SIZE = 32
-NUM_EPOCHS = 10
+NUM_EPOCHS = 20
 
 
 #Function to pickle model parameters as dictionary
